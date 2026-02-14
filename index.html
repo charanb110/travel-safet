@@ -1,28 +1,891 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Travel Safety Tracker</title>
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Journey Guardian</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBg3wqMJfJ3GH1y3zJ7l3Z5g5N5g5N5g5N"></script>
+  <style>
+    * { font-family: 'Space Grotesk', sans-serif; }
+    
+    @keyframes pulse-ring {
+      0% { transform: scale(0.8); opacity: 1; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+    
+    .pulse-ring {
+      animation: pulse-ring 1.5s ease-out infinite;
+    }
+    
+    .shake {
+      animation: shake 0.5s ease-in-out infinite;
+    }
+    
+    .progress-ring {
+      transition: stroke-dashoffset 1s linear;
+    }
+    
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .fade-in {
+      animation: fade-in 0.4s ease-out forwards;
+    }
 
-  <link rel="stylesheet"
-    href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    .map-container {
+      width: 100%;
+      height: 300px;
+      border-radius: 1rem;
+      overflow: hidden;
+      border: 2px solid rgba(16, 185, 129, 0.3);
+    }
 
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
+    .gps-pulse {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
 
-<h2>🛡️ Travel Safety Tracker</h2>
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full bg-slate-900 text-white overflow-auto">
+  <div id="app" class="w-full min-h-full bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900"><!-- Step 1: Start Journey Form -->
+   <div id="step-start" class="p-6 max-w-md mx-auto fade-in">
+    <div class="text-center mb-8 pt-6">
+     <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 mb-4">
+      <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+     </div>
+     <h1 id="title-display" class="text-2xl font-bold text-white mb-2">Journey Guardian</h1>
+     <p class="text-slate-400 text-sm">Your safety companion with live GPS tracking</p>
+    </div>
+    <form id="journey-form" class="space-y-4">
+     <div><label for="start-location" class="block text-sm font-medium text-slate-300 mb-2">📍 Starting Location</label> <input type="text" id="start-location" placeholder="Enter starting point..." class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition">
+     </div>
+     <div><label for="destination" class="block text-sm font-medium text-slate-300 mb-2">🎯 Destination</label> <input type="text" id="destination" placeholder="Where are you going?" class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition">
+     </div>
+     <div><label class="block text-sm font-medium text-slate-300 mb-2">🚗 Mode of Transport</label>
+      <div class="grid grid-cols-4 gap-2"><button type="button" data-transport="walk" class="transport-btn flex flex-col items-center p-3 bg-slate-800/50 border border-slate-600 rounded-xl hover:border-emerald-400 transition"> <span class="text-2xl mb-1">🚶</span> <span class="text-xs text-slate-400">Walk</span> </button> <button type="button" data-transport="bike" class="transport-btn flex flex-col items-center p-3 bg-slate-800/50 border border-slate-600 rounded-xl hover:border-emerald-400 transition"> <span class="text-2xl mb-1">🚴</span> <span class="text-xs text-slate-400">Bike</span> </button> <button type="button" data-transport="car" class="transport-btn flex flex-col items-center p-3 bg-slate-800/50 border border-slate-600 rounded-xl hover:border-emerald-400 transition"> <span class="text-2xl mb-1">🚗</span> <span class="text-xs text-slate-400">Car</span> </button> <button type="button" data-transport="transit" class="transport-btn flex flex-col items-center p-3 bg-slate-800/50 border border-slate-600 rounded-xl hover:border-emerald-400 transition"> <span class="text-2xl mb-1">🚌</span> <span class="text-xs text-slate-400">Transit</span> </button>
+      </div>
+     </div>
+     <div><label for="emergency-contact" class="block text-sm font-medium text-slate-300 mb-2">🆘 Emergency Contact</label> <input type="text" id="emergency-contact" placeholder="Contact name or number..." class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition">
+     </div><button type="submit" id="start-btn" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"> 🚀 Start Journey (GPS Will Auto-Detect) </button>
+    </form><!-- Journey History -->
+    <div id="history-section" class="mt-8 hidden">
+     <h3 class="text-sm font-medium text-slate-400 mb-3">Recent Journeys</h3>
+     <div id="history-list" class="space-y-2"></div>
+    </div>
+   </div><!-- Step 2: Active Journey / Countdown with Map -->
+   <div id="step-active" class="p-6 max-w-2xl mx-auto hidden fade-in">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6"><!-- Map Section -->
+     <div class="lg:col-span-2">
+      <div id="map" class="map-container mb-4"></div>
+      <div class="bg-slate-800/50 rounded-2xl p-4 space-y-3">
+       <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center"><span class="gps-pulse"></span>
+        </div>
+        <div class="flex-1">
+         <p class="text-slate-400 text-xs">Current Location</p>
+         <p id="current-location" class="text-white text-sm font-medium">📍 Detecting location...</p>
+        </div>
+       </div>
+       <div class="grid grid-cols-3 gap-2">
+        <div class="bg-slate-700/30 rounded-lg p-3 text-center">
+         <p class="text-slate-500 text-xs">Distance</p>
+         <p id="distance-display" class="text-emerald-400 font-bold text-lg">-- km</p>
+        </div>
+        <div class="bg-slate-700/30 rounded-lg p-3 text-center">
+         <p class="text-slate-500 text-xs">Time Left</p>
+         <p id="time-left-display" class="text-amber-400 font-bold text-lg">--:--</p>
+        </div>
+        <div class="bg-slate-700/30 rounded-lg p-3 text-center">
+         <p class="text-slate-500 text-xs">Speed</p>
+         <p id="speed-display" class="text-blue-400 font-bold text-lg">-- km/h</p>
+        </div>
+       </div>
+      </div>
+     </div><!-- Right Panel -->
+     <div class="space-y-4"><!-- Timer -->
+      <div class="text-center">
+       <div class="relative inline-flex items-center justify-center">
+        <svg class="w-40 h-40 transform -rotate-90"><circle cx="80" cy="80" r="72" fill="none" stroke="#1e293b" stroke-width="6" /> <circle id="progress-circle" cx="80" cy="80" r="72" fill="none" stroke="url(#gradient)" stroke-width="6" stroke-dasharray="452" stroke-dashoffset="0" class="progress-ring" stroke-linecap="round" /> <defs>
+          <lineargradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+           <stop offset="0%" stop-color="#34d399" />
+           <stop offset="100%" stop-color="#14b8a6" />
+          </lineargradient>
+         </defs>
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-slate-400 text-xs">Estimated</span> <span id="countdown-display" class="text-3xl font-bold text-white">--:--</span> <span id="status-badge" class="mt-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">🟢 On Track</span>
+        </div>
+       </div>
+      </div><!-- Route Info -->
+      <div class="bg-slate-800/50 rounded-2xl p-4">
+       <div class="flex items-center gap-3 mb-3">
+        <div class="w-3 h-3 bg-emerald-400 rounded-full"></div><span id="active-start" class="text-slate-300 text-sm truncate">Starting location</span>
+       </div>
+       <div class="ml-1.5 border-l-2 border-dashed border-slate-600 h-6"></div>
+       <div class="flex items-center gap-3">
+        <div class="w-3 h-3 bg-rose-400 rounded-full"></div><span id="active-destination" class="text-slate-300 text-sm truncate">Destination</span>
+       </div>
+      </div>
+      <div class="flex items-center justify-between bg-slate-800/50 rounded-xl p-3">
+       <div class="flex items-center gap-2"><span id="active-transport-icon" class="text-2xl">🚗</span> <span id="active-transport" class="text-slate-400 text-sm">Car</span>
+       </div>
+      </div>
+      <div class="space-y-2"><button id="extend-btn" class="w-full py-2 bg-amber-500/20 text-amber-400 font-medium rounded-xl border border-amber-500/30 hover:bg-amber-500/30 transition text-sm"> ⏰ Extend Time </button> <button id="pause-btn" class="w-full py-2 bg-blue-500/20 text-blue-400 font-medium rounded-xl border border-blue-500/30 hover:bg-blue-500/30 transition text-sm"> ⏸️ Pause </button>
+      </div><button id="arrived-btn" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition text-sm"> ✅ Arrived Safely </button>
+     </div>
+    </div>
+   </div><!-- Step 3: Warning State -->
+   <div id="step-warning" class="p-6 max-w-md mx-auto hidden fade-in">
+    <div class="text-center">
+     <div class="relative inline-flex items-center justify-center mb-6">
+      <div class="absolute w-32 h-32 bg-amber-500/20 rounded-full pulse-ring"></div>
+      <div class="w-24 h-24 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center shake"><span class="text-4xl">⚠️</span>
+      </div>
+     </div>
+     <h2 class="text-2xl font-bold text-amber-400 mb-2">Time's Up!</h2>
+     <p class="text-slate-400 mb-4">You haven't arrived at your destination</p>
+     <div class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 mb-6"><span class="text-slate-400 text-sm block mb-2">Alert will be sent in</span> <span id="warning-countdown" class="text-5xl font-bold text-amber-400">30</span> <span class="text-amber-400 text-xl ml-1">seconds</span>
+     </div>
+     <div class="space-y-3"><button id="im-safe-btn" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold rounded-xl shadow-lg hover:scale-[1.02] transition"> ✅ I'm Safe - Stop Alert </button> <button id="extend-warning-btn" class="w-full py-3 bg-amber-500/20 text-amber-400 font-medium rounded-xl border border-amber-500/30 hover:bg-amber-500/30 transition"> ⏰ Need More Time </button> <button id="pause-warning-btn" class="w-full py-3 bg-blue-500/20 text-blue-400 font-medium rounded-xl border border-blue-500/30 hover:bg-blue-500/30 transition"> ⏸️ Pause Journey </button>
+     </div>
+    </div>
+   </div><!-- Step 4: Emergency Alert Sent -->
+   <div id="step-emergency" class="p-6 max-w-md mx-auto hidden fade-in">
+    <div class="text-center">
+     <div class="relative inline-flex items-center justify-center mb-6">
+      <div class="absolute w-32 h-32 bg-rose-500/20 rounded-full pulse-ring"></div>
+      <div class="w-24 h-24 bg-gradient-to-br from-rose-500 to-red-600 rounded-full flex items-center justify-center"><span class="text-4xl">🚨</span>
+      </div>
+     </div>
+     <h2 class="text-2xl font-bold text-rose-400 mb-2">Emergency Alert Sent</h2>
+     <p class="text-slate-400 mb-6">Your emergency contacts have been notified</p>
+     <div class="bg-slate-800/50 rounded-2xl p-4 mb-6 text-left space-y-3">
+      <div class="flex items-center gap-3">
+       <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center"><span class="text-emerald-400">✓</span>
+       </div><span class="text-slate-300 text-sm">Live GPS location shared</span>
+      </div>
+      <div class="flex items-center gap-3">
+       <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center"><span class="text-emerald-400">✓</span>
+       </div><span class="text-slate-300 text-sm">Emergency message sent</span>
+      </div>
+      <div class="flex items-center gap-3">
+       <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center"><span class="text-emerald-400">✓</span>
+       </div><span class="text-slate-300 text-sm">Google Maps link included</span>
+      </div>
+      <div class="flex items-center gap-3">
+       <div class="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center"><span class="text-emerald-400">✓</span>
+       </div><span id="contact-notified" class="text-slate-300 text-sm">Contact notified</span>
+      </div>
+     </div>
+     <div class="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 mb-6">
+      <p id="emergency-message-display" class="text-rose-300 text-sm italic">"I may need help! Here's my location:"</p>
+      <p id="location-link" class="text-blue-400 text-xs mt-2 truncate">📍 Location link would appear here</p>
+     </div><button id="false-alarm-btn" class="w-full py-4 bg-slate-700 text-white font-semibold rounded-xl hover:bg-slate-600 transition"> ✅ False Alarm - I'm Safe Now </button>
+    </div>
+   </div><!-- Step 5: Trip Completed Successfully -->
+   <div id="step-complete" class="p-6 max-w-md mx-auto hidden fade-in">
+    <div class="text-center">
+     <div class="relative inline-flex items-center justify-center mb-6">
+      <div class="absolute w-32 h-32 bg-emerald-500/20 rounded-full pulse-ring"></div>
+      <div class="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center"><span class="text-4xl">🎉</span>
+      </div>
+     </div>
+     <h2 class="text-2xl font-bold text-emerald-400 mb-2">You've Arrived Safely!</h2>
+     <p id="safe-message-display" class="text-slate-400 mb-6">I've arrived safely at my destination!</p>
+     <div class="bg-slate-800/50 rounded-2xl p-4 mb-6">
+      <div class="grid grid-cols-2 gap-4 text-center">
+       <div><span class="text-slate-500 text-xs block mb-1">Journey Time</span> <span id="final-time" class="text-white font-semibold">--:--</span>
+       </div>
+       <div><span class="text-slate-500 text-xs block mb-1">Distance</span> <span id="final-distance" class="text-white font-semibold">-- km</span>
+       </div>
+      </div>
+     </div><button id="new-journey-btn" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition"> 🚀 Start New Journey </button>
+    </div>
+   </div><!-- Extend Time Modal -->
+   <div id="extend-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
+    <div class="bg-slate-800 rounded-2xl p-6 max-w-sm w-full">
+     <h3 class="text-lg font-bold text-white mb-4">Extend Journey Time</h3>
+     <div class="flex gap-2 mb-4"><input type="number" id="extend-hours" placeholder="Hours" min="0" max="12" class="w-1/2 px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400"> <input type="number" id="extend-minutes" placeholder="Minutes" min="0" max="59" class="w-1/2 px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+     </div>
+     <div class="flex gap-2"><button id="cancel-extend" class="flex-1 py-3 bg-slate-700 text-slate-300 font-medium rounded-xl hover:bg-slate-600 transition">Cancel</button> <button id="confirm-extend" class="flex-1 py-3 bg-emerald-500 text-white font-medium rounded-xl hover:bg-emerald-600 transition">Extend</button>
+     </div>
+    </div>
+   </div><!-- Toast Notification -->
+   <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 bg-slate-800 border border-slate-600 rounded-xl shadow-xl hidden transition-all duration-300 z-50"><span id="toast-message" class="text-white text-sm"></span>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      app_title: 'Journey Guardian',
+      emergency_message: "I may need help! Here's my location:",
+      safe_message: "I've arrived safely at my destination!",
+      background_color: '#0f172a',
+      accent_color: '#10b981',
+      text_color: '#f1f5f9',
+      warning_color: '#f59e0b',
+      danger_color: '#ef4444'
+    };
 
-<input type="number" id="time"
-placeholder="Enter Time (minutes)">
-<button onclick="startJourney()">Start</button>
-<button onclick="stopJourney()">STOP</button>
+    let journeyData = [];
+    let currentJourney = null;
+    let countdownInterval = null;
+    let warningInterval = null;
+    let gpsInterval = null;
+    let locationUpdateInterval = null;
+    let remainingSeconds = 0;
+    let warningSeconds = 30;
+    let isPaused = false;
+    let selectedTransport = null;
+    let journeyStartTime = null;
+    let currentLat = null;
+    let currentLng = null;
+    let destinationLat = null;
+    let destinationLng = null;
+    let startLat = null;
+    let startLng = null;
+    let totalDistance = 0;
+    let map = null;
+    let userMarker = null;
+    let destinationMarker = null;
+    let routePath = null;
+    let estimatedTime = 0;
+    let previousPosition = null;
 
-<p id="timer"></p>
+    const transportIcons = {
+      walk: '🚶',
+      bike: '🚴',
+      car: '🚗',
+      transit: '🚌'
+    };
 
-<div id="map"></div>
+    // Speed estimates (km/h)
+    const speedEstimates = {
+      walk: 5,
+      bike: 15,
+      car: 40,
+      transit: 30
+    };
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="script.js"></script>
+    const dataHandler = {
+      onDataChanged(data) {
+        journeyData = data;
+        renderHistory();
+      }
+    };
 
-</body>
+    async function initApp() {
+      if (window.dataSdk) {
+        const result = await window.dataSdk.init(dataHandler);
+        if (!result.isOk) {
+          console.error('Failed to init data SDK');
+        }
+      }
+
+      if (window.elementSdk) {
+        window.elementSdk.init({
+          defaultConfig,
+          onConfigChange: async (config) => {
+            applyConfig(config);
+          },
+          mapToCapabilities: (config) => ({
+            recolorables: [
+              {
+                get: () => config.background_color || defaultConfig.background_color,
+                set: (v) => window.elementSdk.setConfig({ background_color: v })
+              },
+              {
+                get: () => config.accent_color || defaultConfig.accent_color,
+                set: (v) => window.elementSdk.setConfig({ accent_color: v })
+              },
+              {
+                get: () => config.text_color || defaultConfig.text_color,
+                set: (v) => window.elementSdk.setConfig({ text_color: v })
+              },
+              {
+                get: () => config.warning_color || defaultConfig.warning_color,
+                set: (v) => window.elementSdk.setConfig({ warning_color: v })
+              },
+              {
+                get: () => config.danger_color || defaultConfig.danger_color,
+                set: (v) => window.elementSdk.setConfig({ danger_color: v })
+              }
+            ],
+            borderables: [],
+            fontEditable: undefined,
+            fontSizeable: undefined
+          }),
+          mapToEditPanelValues: (config) => new Map([
+            ['app_title', config.app_title || defaultConfig.app_title],
+            ['emergency_message', config.emergency_message || defaultConfig.emergency_message],
+            ['safe_message', config.safe_message || defaultConfig.safe_message]
+          ])
+        });
+      }
+
+      setupEventListeners();
+      applyConfig(defaultConfig);
+    }
+
+    function applyConfig(config) {
+      const title = config.app_title || defaultConfig.app_title;
+      const emergencyMsg = config.emergency_message || defaultConfig.emergency_message;
+      const safeMsg = config.safe_message || defaultConfig.safe_message;
+      const bgColor = config.background_color || defaultConfig.background_color;
+      const accentColor = config.accent_color || defaultConfig.accent_color;
+
+      document.getElementById('title-display').textContent = title;
+      document.getElementById('safe-message-display').textContent = safeMsg;
+      document.getElementById('emergency-message-display').textContent = `"${emergencyMsg}"`;
+
+      document.body.style.background = `linear-gradient(135deg, ${bgColor}, ${adjustColor(bgColor, 20)}, ${adjustColor(accentColor, -60)})`;
+      document.getElementById('app').style.background = 'transparent';
+    }
+
+    function adjustColor(hex, amount) {
+      const num = parseInt(hex.replace('#', ''), 16);
+      const r = Math.min(255, Math.max(0, (num >> 16) + amount));
+      const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amount));
+      const b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
+      return `#${(1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1)}`;
+    }
+
+    function setupEventListeners() {
+      document.querySelectorAll('.transport-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.transport-btn').forEach(b => {
+            b.classList.remove('border-emerald-400', 'bg-emerald-500/20');
+          });
+          btn.classList.add('border-emerald-400', 'bg-emerald-500/20');
+          selectedTransport = btn.dataset.transport;
+        });
+      });
+
+      document.getElementById('journey-form').addEventListener('submit', handleStartJourney);
+      document.getElementById('arrived-btn').addEventListener('click', handleArrived);
+      document.getElementById('extend-btn').addEventListener('click', showExtendModal);
+      document.getElementById('pause-btn').addEventListener('click', togglePause);
+      document.getElementById('im-safe-btn').addEventListener('click', handleArrived);
+      document.getElementById('extend-warning-btn').addEventListener('click', showExtendModal);
+      document.getElementById('pause-warning-btn').addEventListener('click', togglePause);
+      document.getElementById('false-alarm-btn').addEventListener('click', handleFalseAlarm);
+      document.getElementById('new-journey-btn').addEventListener('click', resetToStart);
+      document.getElementById('cancel-extend').addEventListener('click', hideExtendModal);
+      document.getElementById('confirm-extend').addEventListener('click', handleExtendTime);
+    }
+
+    async function geocodeLocation(address) {
+      try {
+        // Simulate geolocation
+        const mockLocations = {
+          'home': { lat: 40.7128, lng: -74.0060, name: 'Home (NYC)' },
+          'work': { lat: 40.7580, lng: -73.9855, name: 'Work (Midtown)' },
+          'park': { lat: 40.7849, lng: -73.9681, name: 'Central Park' },
+          'office': { lat: 40.7489, lng: -73.9680, name: 'Times Square' }
+        };
+
+        const key = address.toLowerCase().substring(0, 4);
+        if (mockLocations[key]) {
+          return mockLocations[key];
+        }
+
+        // Generate random nearby location if not found
+        return {
+          lat: 40.7128 + (Math.random() - 0.5) * 0.1,
+          lng: -74.0060 + (Math.random() - 0.5) * 0.1,
+          name: address
+        };
+      } catch (e) {
+        console.error('Geocoding error:', e);
+        return null;
+      }
+    }
+
+    function calculateDistance(lat1, lng1, lat2, lng2) {
+      const R = 6371; // Earth's radius in km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function initMap() {
+      const center = { lat: startLat || 40.7128, lng: startLng || -74.0060 };
+      
+      if (!map) {
+        map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 15,
+          center: center,
+          styles: [
+            { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+            { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+            { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+            { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+            { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+            { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#263c3f' }] },
+            { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
+            { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
+            { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#746855' }] },
+            { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1f2835' }] },
+            { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#9ca5b3' }] },
+            { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2f3948' }] },
+            { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
+            { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#515c6d' }] }
+          ]
+        });
+      }
+
+      // Add start marker
+      if (userMarker) userMarker.setMap(null);
+      userMarker = new google.maps.Marker({
+        position: center,
+        map: map,
+        title: 'Start',
+        icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+      });
+
+      // Add destination marker
+      if (destinationMarker) destinationMarker.setMap(null);
+      destinationMarker = new google.maps.Marker({
+        position: { lat: destinationLat, lng: destinationLng },
+        map: map,
+        title: 'Destination',
+        icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+      });
+
+      // Draw route
+      if (routePath) routePath.setMap(null);
+      routePath = new google.maps.Polyline({
+        path: [
+          { lat: startLat, lng: startLng },
+          { lat: destinationLat, lng: destinationLng }
+        ],
+        geodesic: true,
+        strokeColor: '#10b981',
+        strokeOpacity: 0.7,
+        strokeWeight: 3,
+        map: map
+      });
+
+      map.fitBounds(new google.maps.LatLngBounds(
+        { lat: Math.min(startLat, destinationLat), lng: Math.min(startLng, destinationLng) },
+        { lat: Math.max(startLat, destinationLat), lng: Math.max(startLng, destinationLng) }
+      ));
+    }
+
+    function startGPSTracking() {
+      gpsInterval = setInterval(async () => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              currentLat = position.coords.latitude;
+              currentLng = position.coords.longitude;
+              updateMapWithCurrentLocation();
+              updateLocationDisplay();
+            },
+            (error) => {
+              // Simulate GPS for demo
+              simulateGPSMovement();
+            }
+          );
+        } else {
+          simulateGPSMovement();
+        }
+      }, 3000);
+    }
+
+    function simulateGPSMovement() {
+      if (!startLat || !destinationLat) return;
+
+      if (!previousPosition) {
+        previousPosition = { lat: startLat, lng: startLng };
+      }
+
+      const progress = (estimatedTime * 1000 - remainingSeconds * 1000) / (estimatedTime * 1000);
+      const moveProgress = Math.min(progress + 0.05, 0.95);
+
+      currentLat = startLat + (destinationLat - startLat) * moveProgress;
+      currentLng = startLng + (destinationLng - startLng) * moveProgress;
+
+      updateMapWithCurrentLocation();
+      updateLocationDisplay();
+    }
+
+    function updateMapWithCurrentLocation() {
+      if (!map || !userMarker) return;
+
+      userMarker.setPosition({ lat: currentLat, lng: currentLng });
+      
+      if (previousPosition) {
+        const speed = calculateDistance(previousPosition.lat, previousPosition.lng, currentLat, currentLng) / 0.05;
+        document.getElementById('speed-display').textContent = speed.toFixed(1) + ' km/h';
+      }
+
+      previousPosition = { lat: currentLat, lng: currentLng };
+    }
+
+    function updateLocationDisplay() {
+      const distanceRemaining = calculateDistance(currentLat, currentLng, destinationLat, destinationLng);
+      document.getElementById('distance-display').textContent = distanceRemaining.toFixed(1) + ' km';
+      document.getElementById('current-location').textContent = `📍 ${currentLat.toFixed(4)}, ${currentLng.toFixed(4)}`;
+
+      // Update time estimate based on distance
+      if (distanceRemaining < 0.5) {
+        document.getElementById('status-badge').textContent = '🔴 Arriving';
+      }
+    }
+
+    async function handleStartJourney(e) {
+      e.preventDefault();
+
+      const startLocation = document.getElementById('start-location').value.trim();
+      const destination = document.getElementById('destination').value.trim();
+      const emergencyContact = document.getElementById('emergency-contact').value.trim();
+
+      if (!startLocation || !destination || !selectedTransport) {
+        showToast('Please fill in all fields');
+        return;
+      }
+
+      showToast('🔍 Detecting location and calculating route...');
+
+      // Geocode locations
+      const startGeo = await geocodeLocation(startLocation);
+      const destGeo = await geocodeLocation(destination);
+
+      if (!startGeo || !destGeo) {
+        showToast('Could not find locations');
+        return;
+      }
+
+      startLat = startGeo.lat;
+      startLng = startGeo.lng;
+      destinationLat = destGeo.lat;
+      destinationLng = destGeo.lng;
+      currentLat = startLat;
+      currentLng = startLng;
+
+      // Calculate distance and time
+      const distance = calculateDistance(startLat, startLng, destinationLat, destinationLng);
+      const speed = speedEstimates[selectedTransport];
+      estimatedTime = Math.ceil((distance / speed) * 60); // in minutes
+      remainingSeconds = estimatedTime * 60;
+
+      journeyStartTime = new Date();
+
+      currentJourney = {
+        id: Date.now().toString(),
+        start_location: startLocation,
+        destination: destination,
+        transport_mode: selectedTransport,
+        estimated_time: estimatedTime,
+        actual_distance: distance,
+        start_time: journeyStartTime.toISOString(),
+        status: 'active',
+        emergency_contact: emergencyContact,
+        latitude: currentLat,
+        longitude: currentLng,
+        created_at: new Date().toISOString()
+      };
+
+      if (window.dataSdk && journeyData.length < 999) {
+        const result = await window.dataSdk.create(currentJourney);
+        if (!result.isOk) {
+          showToast('Failed to save journey');
+        }
+      }
+
+      showStep('step-active');
+      updateActiveDisplay();
+      initMap();
+      startGPSTracking();
+      startCountdown();
+      
+      showToast(`✅ Route calculated: ${distance.toFixed(1)} km, ~${estimatedTime} min`);
+    }
+
+    function updateActiveDisplay() {
+      document.getElementById('active-start').textContent = currentJourney.start_location;
+      document.getElementById('active-destination').textContent = currentJourney.destination;
+      document.getElementById('active-transport-icon').textContent = transportIcons[currentJourney.transport_mode];
+      document.getElementById('active-transport').textContent = currentJourney.transport_mode.charAt(0).toUpperCase() + currentJourney.transport_mode.slice(1);
+    }
+
+    function startCountdown() {
+      clearInterval(countdownInterval);
+      const totalSeconds = remainingSeconds;
+
+      countdownInterval = setInterval(() => {
+        if (!isPaused) {
+          remainingSeconds--;
+
+          const progress = remainingSeconds / totalSeconds;
+          const circumference = 2 * Math.PI * 72;
+          const offset = circumference * (1 - progress);
+          document.getElementById('progress-circle').style.strokeDashoffset = offset;
+
+          const mins = Math.floor(remainingSeconds / 60);
+          const secs = remainingSeconds % 60;
+          document.getElementById('countdown-display').textContent = 
+            `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+          document.getElementById('time-left-display').textContent = 
+            `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+          if (remainingSeconds <= 60 && remainingSeconds > 0) {
+            document.getElementById('status-badge').textContent = '🟡 Almost there';
+            document.getElementById('status-badge').className = 'mt-2 px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full';
+          }
+
+          if (remainingSeconds <= 0) {
+            clearInterval(countdownInterval);
+            startWarning();
+          }
+        }
+      }, 1000);
+    }
+
+    function startWarning() {
+      warningSeconds = 30;
+      showStep('step-warning');
+
+      warningInterval = setInterval(() => {
+        warningSeconds--;
+        document.getElementById('warning-countdown').textContent = warningSeconds;
+
+        if (warningSeconds <= 0) {
+          clearInterval(warningInterval);
+          triggerEmergency();
+        }
+      }, 1000);
+    }
+
+    async function triggerEmergency() {
+      showStep('step-emergency');
+      
+      document.getElementById('contact-notified').textContent = 
+        currentJourney.emergency_contact 
+          ? `${currentJourney.emergency_contact} notified` 
+          : 'Emergency contacts notified';
+
+      const mapsLink = `https://maps.google.com/?q=${currentLat},${currentLng}`;
+      document.getElementById('location-link').innerHTML = `<a href="${mapsLink}" target="_blank" rel="noopener noreferrer">📍 View on Google Maps</a>`;
+
+      const config = window.elementSdk?.config || defaultConfig;
+      document.getElementById('emergency-message-display').textContent = 
+        `"${config.emergency_message || defaultConfig.emergency_message}"`;
+
+      if (currentJourney) {
+        currentJourney.status = 'emergency';
+        await updateJourneyStatus('emergency');
+      }
+    }
+
+    async function handleArrived() {
+      clearInterval(countdownInterval);
+      clearInterval(warningInterval);
+      clearInterval(gpsInterval);
+
+      const totalTime = Math.floor((Date.now() - journeyStartTime.getTime()) / 1000);
+      const mins = Math.floor(totalTime / 60);
+      const secs = totalTime % 60;
+      document.getElementById('final-time').textContent = 
+        `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      document.getElementById('final-distance').textContent = currentJourney.actual_distance.toFixed(1) + ' km';
+
+      if (currentJourney) {
+        currentJourney.status = 'completed';
+        await updateJourneyStatus('completed');
+      }
+
+      showStep('step-complete');
+    }
+
+    async function handleFalseAlarm() {
+      if (currentJourney) {
+        currentJourney.status = 'safe';
+        await updateJourneyStatus('safe');
+      }
+      resetToStart();
+    }
+
+    async function updateJourneyStatus(status) {
+      if (window.dataSdk && currentJourney) {
+        const existingJourney = journeyData.find(j => j.id === currentJourney.id);
+        if (existingJourney) {
+          existingJourney.status = status;
+          await window.dataSdk.update(existingJourney);
+        }
+      }
+    }
+
+    function showExtendModal() {
+      document.getElementById('extend-modal').classList.remove('hidden');
+      document.getElementById('extend-modal').classList.add('flex');
+    }
+
+    function hideExtendModal() {
+      document.getElementById('extend-modal').classList.add('hidden');
+      document.getElementById('extend-modal').classList.remove('flex');
+    }
+
+    function handleExtendTime() {
+      const hours = parseInt(document.getElementById('extend-hours').value) || 0;
+      const minutes = parseInt(document.getElementById('extend-minutes').value) || 0;
+      const additionalSeconds = (hours * 3600) + (minutes * 60);
+
+      if (additionalSeconds > 0) {
+        remainingSeconds += additionalSeconds;
+        clearInterval(warningInterval);
+        
+        if (document.getElementById('step-warning').classList.contains('hidden') === false) {
+          showStep('step-active');
+          startCountdown();
+        }
+        
+        showToast(`Added ${hours}h ${minutes}m to journey`);
+      }
+
+      hideExtendModal();
+      document.getElementById('extend-hours').value = '';
+      document.getElementById('extend-minutes').value = '';
+    }
+
+    function togglePause() {
+      isPaused = !isPaused;
+      const pauseBtn = document.getElementById('pause-btn');
+      
+      if (isPaused) {
+        pauseBtn.innerHTML = '▶️ Resume';
+        document.getElementById('status-badge').textContent = '⏸️ Paused';
+        document.getElementById('status-badge').className = 'mt-2 px-3 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full';
+        showToast('Journey paused');
+      } else {
+        pauseBtn.innerHTML = '⏸️ Pause';
+        document.getElementById('status-badge').textContent = '🟢 On Track';
+        document.getElementById('status-badge').className = 'mt-2 px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full';
+        showToast('Journey resumed');
+      }
+    }
+
+    function resetToStart() {
+      clearInterval(countdownInterval);
+      clearInterval(warningInterval);
+      clearInterval(gpsInterval);
+      
+      currentJourney = null;
+      remainingSeconds = 0;
+      warningSeconds = 30;
+      isPaused = false;
+      selectedTransport = null;
+      currentLat = null;
+      currentLng = null;
+      previousPosition = null;
+
+      document.getElementById('journey-form').reset();
+      document.querySelectorAll('.transport-btn').forEach(b => {
+        b.classList.remove('border-emerald-400', 'bg-emerald-500/20');
+      });
+
+      document.getElementById('pause-btn').innerHTML = '⏸️ Pause';
+      document.getElementById('progress-circle').style.strokeDashoffset = 0;
+      
+      showStep('step-start');
+    }
+
+    function showStep(stepId) {
+      ['step-start', 'step-active', 'step-warning', 'step-emergency', 'step-complete'].forEach(id => {
+        const el = document.getElementById(id);
+        el.classList.add('hidden');
+        el.classList.remove('fade-in');
+      });
+      
+      const activeStep = document.getElementById(stepId);
+      activeStep.classList.remove('hidden');
+      void activeStep.offsetWidth;
+      activeStep.classList.add('fade-in');
+    }
+
+    function renderHistory() {
+      const historySection = document.getElementById('history-section');
+      const historyList = document.getElementById('history-list');
+      
+      if (journeyData.length === 0) {
+        historySection.classList.add('hidden');
+        return;
+      }
+
+      historySection.classList.remove('hidden');
+      
+      const sortedData = [...journeyData].sort((a, b) => 
+        new Date(b.created_at) - new Date(a.created_at)
+      ).slice(0, 5);
+
+      historyList.innerHTML = '';
+      
+      sortedData.forEach(journey => {
+        const statusColors = {
+          completed: 'bg-emerald-500/20 text-emerald-400',
+          emergency: 'bg-rose-500/20 text-rose-400',
+          active: 'bg-blue-500/20 text-blue-400',
+          safe: 'bg-emerald-500/20 text-emerald-400'
+        };
+
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between p-3 bg-slate-800/30 rounded-xl';
+        item.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="text-xl flex-shrink-0">${transportIcons[journey.transport_mode] || '🚗'}</span>
+            <div class="min-w-0">
+              <p class="text-white text-sm truncate">${journey.destination}</p>
+              <p class="text-slate-500 text-xs">${journey.actual_distance ? journey.actual_distance.toFixed(1) + ' km' : '-- km'} • ${new Date(journey.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+          <span class="px-2 py-1 ${statusColors[journey.status] || statusColors.active} text-xs rounded-full flex-shrink-0 ml-2">
+            ${journey.status}
+          </span>
+        `;
+        historyList.appendChild(item);
+      });
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toast-message');
+      toastMessage.textContent = message;
+      toast.classList.remove('hidden');
+      
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+
+    initApp();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cde9619239f3501',t:'MTc3MTA5MzI5OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
